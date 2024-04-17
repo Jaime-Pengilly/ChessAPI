@@ -14,30 +14,34 @@ struct User: Codable, Hashable {
     public var url: String
 //    public var chess_rapid: String
     public var avatar: String
+    init() {
+        self.username = ""
+        self.country = ""
+        self.league = ""
+        self.url = ""
+        self.avatar = ""
+    }
 }
 
 struct Result: Codable {
-    var items: [User]
+    var items: User
 }
 
 struct ContentView: View {
-    @State var users:[User] = []
+    @State var user:User = User()
     @State var searchText = ""
+    
     
     var body: some View {
         NavigationStack{
-            if users.count == 0 && !searchText.isEmpty{
-                VStack {
-                    ProgressView().padding()
-                    Text("Fetching Users...")
-                        .foregroundStyle(Color.pink)
-                        .onAppear{
-                            getUsers()
-                        }
+            TextField("", text: $searchText)
+            Button(action: {
+                Task {
+                    try await getUsers()
                 }
-            } else {
-                List(users, id:\.self) {user in
-                    Link(destination:URL(string:user.url)!){
+            }, label: {Text("Button")})
+                VStack{
+//                    Link(destination:URL(string:user.url ?? URL(""))){
                         
                         HStack(alignment:.top){
                             AsyncImage(url:URL(string: user.avatar)){ response
@@ -48,7 +52,6 @@ struct ContentView: View {
                                         .frame(width:50, height: 50)
                                 default:
                                     Image(systemName:"nosign")
-                                }
                             }
                         }
                         VStack(alignment: .leading) {
@@ -59,36 +62,46 @@ struct ContentView: View {
                         }
                     }
                 }
-                }
+//                }
         }.searchable(text:$searchText)
             .onSubmit(of: .search){
-                getUsers()
+                Task {
+                    try await getUsers()
+                }
         }
     }
     
     
-    func getUsers(){
+    func getUsers() async throws {
         let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        
+        print(trimmedSearchText)
         guard !trimmedSearchText.isEmpty else {
             return
         }
-        if let apiURL =
-            URL(string: "https://api.chess.com/pub/player/hikaru"){
+        guard let apiURL =
+            URL(string: "https://api.chess.com/pub/player/\(trimmedSearchText)") else{
+            throw UserError.invalidURL
+        }
             var request = URLRequest(url:apiURL)
             request.httpMethod = "GET"
-            URLSession.shared.dataTask(with: request){
-                data, response,error in
-                if let userData = data {
-                    if let usersFromAPI = try? JSONDecoder().decode(Result.self, from: userData){
-                        users = usersFromAPI.items
-                        print(users)
-                    }
-                }
-            }.resume()
-        }
+            let (data, _) = try await URLSession.shared.data(for: request)
+                
+                print(data)
+                user = try JSONDecoder().decode(User.self, from: data)
+            print(user.username)
+                //                print(error)
+                
+                
+                
+            }
+        
     }
-}
+    enum UserError: Error {
+        case invalidURL
+        case decodingFailed
+    }
+
+
 #Preview {
     ContentView()
 }
