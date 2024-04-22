@@ -7,29 +7,30 @@
 
 import SwiftUI
 
-struct User: Codable, Hashable {
-    public var username: String
-    public var country: String
-    public var league: String
-    public var url: String
-//    public var chess_rapid: String
-    public var avatar: String
-    init() {
-        self.username = ""
-        self.country = ""
-        self.league = ""
-        self.url = ""
-        self.avatar = ""
+
+
+struct User: Codable {
+    let main: Main
+    let name: String
+
+    struct Main: Codable {
+        let temp: Double
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case main, name
     }
 }
+
 
 struct Result: Codable {
     var items: User
 }
 
 struct ContentView: View {
-    @State var user:User = User()
+    @State var user = User(main: User.Main(temp: 0.0), name: "")
     @State var searchText = ""
+    @State var api_key = "42da2bce0e78133bf8511ed50e693b10"
     
     
     var body: some View {
@@ -44,7 +45,7 @@ struct ContentView: View {
 //                    Link(destination:URL(string:user.url ?? URL(""))){
                         
                         HStack(alignment:.top){
-                            AsyncImage(url:URL(string: user.avatar)){ response
+                            AsyncImage(url:URL(string: user.name)){ response
                                 in
                                 switch response {
                                 case .success(let image):
@@ -55,8 +56,8 @@ struct ContentView: View {
                             }
                         }
                         VStack(alignment: .leading) {
-                            Text(user.username)
-                            Text("\(user.url)")
+//                            Text(user.temp)
+                            Text("\(user.name)")
                                 .font(.system(size:11))
                                 .foregroundColor(Color.gray)
                         }
@@ -74,21 +75,28 @@ struct ContentView: View {
     
     func getUsers() async throws {
         let trimmedSearchText = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        print(trimmedSearchText)
+
         guard !trimmedSearchText.isEmpty else {
             return
         }
         guard let apiURL =
-            URL(string: "https://api.chess.com/pub/player/\(trimmedSearchText)") else{
+            URL(string: "https://api.openweathermap.org/data/2.5/weather?zip=\(trimmedSearchText),us&appid=\(api_key)&units=imperial") else{
             throw UserError.invalidURL
         }
             var request = URLRequest(url:apiURL)
             request.httpMethod = "GET"
+        do {
             let (data, _) = try await URLSession.shared.data(for: request)
+            let user = try JSONDecoder().decode(User.self, from: data)
+            print(user)
+        } catch let decodingError {
+            print("Decoding Error:", decodingError)
+        } catch {
+            print("Error:", error)
+            throw error
+        }
                 
-                print(data)
-                user = try JSONDecoder().decode(User.self, from: data)
-            print(user.username)
+        
                 //                print(error)
                 
                 
